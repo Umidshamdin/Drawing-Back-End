@@ -1,1 +1,6 @@
-<Solution />
+<Solution>
+  <Project Path="Drawing.API/Drawing.API.csproj" Id="48ad6dce-a000-4716-873a-c5c299025e58" />
+  <Project Path="Drawing.Application/Drawing.Application.csproj" Id="b392dc3b-e16d-4a3c-894d-e58b7051d452" />
+  <Project Path="Drawing.Domain/Drawing.Domain.csproj" Id="830f1f97-b5ff-4ea2-a7b1-8b2ec73a5825" />
+  <Project Path="Drawing.Infrastructure/Drawing.Infrastructure.csproj" Id="e2dd0ded-bc52-48af-b0be-db44069aba09" />
+</Solution>
