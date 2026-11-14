@@ -1,8 +1,6 @@
-﻿
-using System.ComponentModel;
+﻿using System.ComponentModel;
 
 namespace Drawing.Domain.Enums;
-
 public enum ArtistStatus
 {
     [Description("Təsdiq gözləyir")]
@@ -17,7 +15,6 @@ public enum ArtistStatus
     [Description("Fəaliyyəti dayandırılıb")]
     Suspended = 4
 }
-
 public enum ArtworkModerationStatus
 {
     [Description("Qaralama")]
@@ -38,7 +35,6 @@ public enum ArtworkModerationStatus
     [Description("Gizlədilib")]
     Hidden = 6
 }
-
 public enum ArtworkSaleStatus
 {
     [Description("Satışdadır")]
@@ -50,7 +46,6 @@ public enum ArtworkSaleStatus
     [Description("Satılıb")]
     Sold = 3
 }
-
 public enum OrderStatus
 {
     [Description("Təsdiq gözləyir")]
@@ -80,7 +75,6 @@ public enum OrderStatus
     [Description("Rədd edilib")]
     Rejected = 9
 }
-
 public enum ReservationStatus
 {
     [Description("Aktivdir")]
@@ -95,7 +89,6 @@ public enum ReservationStatus
     [Description("Satışa çevrilib")]
     ConvertedToSale = 4
 }
-
 public enum PaymentStatus
 {
     [Description("Ödəniş gözlənilir")]
