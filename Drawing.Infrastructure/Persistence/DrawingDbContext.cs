@@ -1,10 +1,13 @@
 ﻿using Drawing.Application.Abstractions.Persistence;
 using Drawing.Domain.Common;
 using Drawing.Domain.Entities;
+using Drawing.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drawing.Infrastructure.Persistence;
-public sealed class DrawingDbContext : DbContext, IUnitOfWork
+public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>, IUnitOfWork
 {
     public DrawingDbContext(DbContextOptions<DrawingDbContext> options) : base(options)
     {
@@ -29,6 +32,42 @@ public sealed class DrawingDbContext : DbContext, IUnitOfWork
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DrawingDbContext).Assembly);
+
+        modelBuilder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(x => x.FullName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(x => x.IsBlocked)
+                .HasDefaultValue(false);
+
+            entity.HasIndex(x => x.IsBlocked);
+        });
+
+        modelBuilder.Entity<ArtistProfile>()
+            .HasOne<ApplicationUser>()
+            .WithOne()
+            .HasForeignKey<ArtistProfile>(x => x.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Favorite>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Order>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(x => x.BuyerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<OrderNote>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(x => x.AdminUserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

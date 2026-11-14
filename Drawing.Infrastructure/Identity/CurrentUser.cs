@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+﻿using System.IdentityModel.Tokens.Jwt;
 using Drawing.Application.Abstractions.Identity;
 using Microsoft.AspNetCore.Http;
 
@@ -19,8 +19,8 @@ public sealed class CurrentUser : ICurrentUser
             if (user?.Identity?.IsAuthenticated != true)
                 return null;
 
-            var userId = user.FindFirstValue(
-                ClaimTypes.NameIdentifier);
+            var userId = user.FindFirst(
+                JwtRegisteredClaimNames.Sub)?.Value;
 
             return Guid.TryParse(userId, out var id)
                 ? id
