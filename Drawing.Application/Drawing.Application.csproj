@@ -10,9 +10,4 @@
     <ProjectReference Include="..\Drawing.Domain\Drawing.Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Common\" />
-    <Folder Include="Features\" />
-  </ItemGroup>
-
 </Project>
