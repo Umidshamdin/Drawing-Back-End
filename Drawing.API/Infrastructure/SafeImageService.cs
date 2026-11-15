@@ -46,10 +46,12 @@ public sealed class SafeImageService
 
     public string ResolvePath(string key)
     {
+
         string folder;
 
         if (key.StartsWith("artworks/", StringComparison.Ordinal)) folder = "artworks";
         else if (key.StartsWith("slides/", StringComparison.Ordinal)) folder = "slides";
+        else if (key.StartsWith("profiles/", StringComparison.Ordinal)) folder = "profiles";
         else throw new ArgumentException("Yanlış fayl ünvanı.");
 
         var fileName = Path.GetFileName(key);
@@ -58,5 +60,6 @@ public sealed class SafeImageService
             throw new ArgumentException("Yanlış fayl adı.");
 
         return Path.Combine(_environment.ContentRootPath, "uploads", folder, fileName);
+
     }
 }

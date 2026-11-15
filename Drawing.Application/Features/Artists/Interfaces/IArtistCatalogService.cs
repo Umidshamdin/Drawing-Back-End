@@ -9,4 +9,5 @@ public interface IArtistCatalogService
     Task ResubmitAsync(Guid userId, CancellationToken ct);
     Task SetFeaturedArtistAsync(Guid artistId, bool featured, CancellationToken ct);
     Task SetFeaturedArtworkAsync(Guid artworkId, bool featured, CancellationToken ct);
+    Task SetProfileImageAsync(Guid userId, string imageUrl, CancellationToken ct);
 }

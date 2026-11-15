@@ -485,44 +485,48 @@ public sealed class MarketplaceService : IMarketplaceService
         return orders.Select(MapOrder).ToList();
     }
 
+
     public async Task TransitionOrderAsync(Guid adminId, Guid id, AdminOrderTransitionRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Action))
-            throw new ArgumentException("Sifariş əməliyyatı seçilməyib.");
+        if (string.IsNullOrWhiteSpace(request.Action)) throw new ArgumentException("Sifariş əməliyyatı tələb olunur.");
+
+        var action = request.Action.Trim().ToLowerInvariant();
 
         await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
 
-        var order = await _db.Orders
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == id, ct)
+        var order = await _db.Orders.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new KeyNotFoundException("Sifariş tapılmadı.");
 
-        if (order.Items.Count != 1)
-            throw new InvalidOperationException("Sifarişdə yalnız bir orijinal əsər olmalıdır.");
+        if (order.Items.Count != 1) throw new InvalidOperationException("Sifariş yalnız bir orijinal əsərdən ibarət olmalıdır.");
 
-        var artworkId = order.Items.First().ArtworkId;
+        var artworkId = order.Items.Single().ArtworkId;
 
-        var artwork = await _db.Artworks.FirstAsync(x => x.Id == artworkId, ct);
+        var artwork = await _db.Artworks.Include(x => x.ArtistProfile).FirstOrDefaultAsync(x => x.Id == artworkId, ct)
+            ?? throw new KeyNotFoundException("Əsər tapılmadı.");
+
         var previousStatus = order.Status;
 
-        switch (request.Action.Trim().ToLowerInvariant())
+        switch (action)
         {
             case "confirm":
                 {
+                    if (order.Status != OrderStatus.Pending) throw new InvalidOperationException("Yalnız yeni sifariş təsdiqlənə bilər.");
+                    if (artwork.ModerationStatus != ArtworkModerationStatus.Approved || artwork.ArtistProfile.Status != ArtistStatus.Approved)
+                        throw new InvalidOperationException("Əsər və ya rəssam təsdiqlənməyib.");
+
                     if (artwork.SaleStatus != ArtworkSaleStatus.Available)
-                        throw new InvalidOperationException("Əsər artıq rezerv edilib və ya satılıb.");
+                        throw new InvalidOperationException("Əsər satış üçün mövcud deyil.");
 
-                    var exists = await _db.Reservations.AnyAsync(x => x.ArtworkId == artwork.Id && x.Status == ReservationStatus.Active, ct);
+                    var hasReservation = await _db.Reservations.AnyAsync(x => x.ArtworkId == artworkId && x.Status == ReservationStatus.Active, ct);
 
-                    if (exists)
-                        throw new InvalidOperationException("Əsərin aktiv rezervasiyası var.");
+                    if (hasReservation) throw new InvalidOperationException("Əsər artıq rezerv edilib.");
 
                     order.Confirm();
                     artwork.Reserve();
 
                     _db.Reservations.Add(new Reservation
                     {
-                        ArtworkId = artwork.Id,
+                        ArtworkId = artworkId,
                         OrderId = order.Id,
                         ExpiresAt = DateTime.UtcNow.AddHours(Math.Clamp(request.ReservationHours, 1, 168))
                     });
@@ -532,38 +536,52 @@ public sealed class MarketplaceService : IMarketplaceService
 
             case "requestpayment":
                 {
-                    if (request.DeliveryFee is < 0)
-                        throw new ArgumentException("Çatdırılma haqqı mənfi ola bilməz.");
+                    if (order.Status != OrderStatus.Confirmed) throw new InvalidOperationException("Sifariş əvvəlcə təsdiqlənməlidir.");
+
+                    var reservation = await _db.Reservations.FirstOrDefaultAsync(x => x.OrderId == id && x.Status == ReservationStatus.Active, ct);
+
+                    if (reservation is null || reservation.ExpiresAt <= DateTime.UtcNow)
+                        throw new InvalidOperationException("Aktiv rezervasiya müddəti bitib.");
+
+                    var fee = request.DeliveryFee ?? 0;
+
+                    if (fee < 0 || fee > 5000) throw new ArgumentException("Çatdırılma haqqı düzgün deyil.");
 
                     order.RequestPayment();
-
-                    order.DeliveryFee = request.DeliveryFee ?? 0;
-                    order.TotalAmount = order.Items.Sum(x => x.UnitPrice * x.Quantity) + order.DeliveryFee;
+                    order.DeliveryFee = fee;
+                    order.TotalAmount = order.Items.Sum(x => x.UnitPrice * x.Quantity) + fee;
 
                     break;
                 }
 
             case "paid":
                 {
-                    if (order.Status != OrderStatus.AwaitingPayment)
-                        throw new InvalidOperationException("Sifariş ödəniş gözləmir.");
+                    if (order.Status != OrderStatus.AwaitingPayment) throw new InvalidOperationException("Sifariş ödəniş gözləmir.");
 
-                    var reservation = await _db.Reservations
-                        .FirstOrDefaultAsync(x => x.OrderId == id && x.Status == ReservationStatus.Active, ct)
-                        ?? throw new InvalidOperationException("Aktiv rezervasiya yoxdur.");
+                    var reservation = await _db.Reservations.FirstOrDefaultAsync(x => x.OrderId == id && x.Status == ReservationStatus.Active, ct);
 
-                    reservation.ConvertToSale();
-                    order.MarkAsPaid();
-                    artwork.MarkAsSold();
+                    if (reservation is null || reservation.ExpiresAt <= DateTime.UtcNow)
+                        throw new InvalidOperationException("Rezervasiya müddəti bitib. Ödəniş təsdiqlənə bilməz.");
+
+                    if (artwork.SaleStatus != ArtworkSaleStatus.Reserved)
+                        throw new InvalidOperationException("Əsərin rezervasiya vəziyyəti düzgün deyil.");
+
+                    var alreadyPaid = await _db.Payments.AnyAsync(x => x.OrderId == id && x.Status == PaymentStatus.Confirmed, ct);
+
+                    if (alreadyPaid) throw new InvalidOperationException("Bu sifariş üçün ödəniş artıq təsdiqlənib.");
 
                     var payment = new Payment
                     {
-                        OrderId = order.Id,
+                        OrderId = id,
                         Amount = order.TotalAmount,
                         Currency = "AZN"
                     };
 
                     payment.Confirm("Manual");
+
+                    reservation.ConvertToSale();
+                    order.MarkAsPaid();
+                    artwork.MarkAsSold();
 
                     _db.Payments.Add(payment);
 
@@ -571,27 +589,57 @@ public sealed class MarketplaceService : IMarketplaceService
                 }
 
             case "prepare":
-                order.StartDeliveryPreparation();
-                break;
+                {
+                    if (order.Status != OrderStatus.Paid) throw new InvalidOperationException("Sifariş ödənilməyib.");
+                    order.StartDeliveryPreparation();
+                    break;
+                }
 
             case "shipped":
-                order.MarkAsShipped();
-                break;
+                {
+                    if (order.Status != OrderStatus.PreparingDelivery)
+                        throw new InvalidOperationException("Sifariş çatdırılmaya hazırlanmır.");
+
+                    var deliveryExists = await _db.Deliveries.AnyAsync(x => x.OrderId == id, ct);
+
+                    if (!deliveryExists) throw new InvalidOperationException("Əvvəlcə çatdırılma məlumatlarını daxil edin.");
+
+                    order.MarkAsShipped();
+                    break;
+                }
 
             case "complete":
-                order.Complete();
-                break;
+                {
+                    if (order.Status != OrderStatus.Shipped) throw new InvalidOperationException("Sifariş göndərilməyib.");
+
+                    var delivery = await _db.Deliveries.FirstOrDefaultAsync(x => x.OrderId == id, ct)
+                        ?? throw new InvalidOperationException("Çatdırılma qeydi tapılmadı.");
+
+                    order.Complete();
+                    delivery.DeliveredAt ??= DateTime.UtcNow;
+
+                    break;
+                }
 
             case "reject":
-                order.Reject(request.Reason ?? string.Empty);
-                break;
+                {
+                    if (order.Status != OrderStatus.Pending)
+                        throw new InvalidOperationException("Yalnız təsdiqlənməmiş sifariş rədd edilə bilər.");
+
+                    if (string.IsNullOrWhiteSpace(request.Reason))
+                        throw new ArgumentException("Rədd səbəbi tələb olunur.");
+
+                    order.Reject(request.Reason.Trim());
+
+                    break;
+                }
 
             case "cancel":
                 {
-                    order.Cancel();
+                    if (order.Status is not (OrderStatus.Pending or OrderStatus.Confirmed or OrderStatus.AwaitingPayment))
+                        throw new InvalidOperationException("Bu mərhələdə sifariş ləğv edilə bilməz.");
 
-                    var reservation = await _db.Reservations
-                        .FirstOrDefaultAsync(x => x.OrderId == id && x.Status == ReservationStatus.Active, ct);
+                    var reservation = await _db.Reservations.FirstOrDefaultAsync(x => x.OrderId == id && x.Status == ReservationStatus.Active, ct);
 
                     if (reservation is not null)
                     {
@@ -599,16 +647,18 @@ public sealed class MarketplaceService : IMarketplaceService
                         artwork.ReleaseReservation();
                     }
 
+                    order.Cancel();
+
                     break;
                 }
 
             default:
-                throw new ArgumentException("Naməlum sifariş əməliyyatı.");
+                throw new ArgumentException("Yanlış sifariş əməliyyatı.");
         }
 
         _db.OrderStatusHistories.Add(new OrderStatusHistory
         {
-            OrderId = id,
+            OrderId = order.Id,
             PreviousStatus = previousStatus,
             NewStatus = order.Status,
             ChangedByUserId = adminId,
@@ -618,14 +668,16 @@ public sealed class MarketplaceService : IMarketplaceService
         _db.AuditLogs.Add(new AuditLog
         {
             ActorUserId = adminId,
-            Action = "Order." + request.Action,
+            Action = "Order." + action,
             EntityName = "Order",
-            EntityId = id.ToString()
+            EntityId = order.Id.ToString(),
+            Details = request.Reason
         });
 
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
     }
+
 
     public async Task<bool> ToggleFavoriteAsync(Guid userId, Guid artworkId, CancellationToken ct)
     {

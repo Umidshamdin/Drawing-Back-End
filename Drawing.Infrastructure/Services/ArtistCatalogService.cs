@@ -105,4 +105,21 @@ public sealed class ArtistCatalogService : IArtistCatalogService
 
         await _db.SaveChangesAsync(ct);
     }
+
+    public async Task SetProfileImageAsync(Guid userId, string imageUrl, CancellationToken ct)
+    {
+        var artist = await _db.ArtistProfiles.FirstOrDefaultAsync(x => x.UserId == userId, ct)
+            ?? throw new KeyNotFoundException("Rəssam profili tapılmadı.");
+
+        if (artist.Status == ArtistStatus.Suspended)
+            throw new InvalidOperationException("Rəssam profili dayandırılıb.");
+
+        if (!imageUrl.StartsWith("/api/v1/media/profiles/", StringComparison.Ordinal))
+            throw new ArgumentException("Yanlış profil şəkli.");
+
+        artist.ProfileImageUrl = null;
+
+        await _db.SaveChangesAsync(ct);
+    }
+
 }
