@@ -38,4 +38,9 @@ app.MapControllers();
 
 await IdentityDataSeeder.SeedRolesAsync(app.Services);
 
+if (app.Environment.IsDevelopment())
+{
+    await DevelopmentAdminSeeder.SeedAsync(app.Services);
+}
+
 app.Run();
