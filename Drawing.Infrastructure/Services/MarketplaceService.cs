@@ -7,11 +7,9 @@ using Drawing.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drawing.Infrastructure.Services;
-
 public sealed class MarketplaceService : IMarketplaceService
 {
     private readonly DrawingDbContext _db;
-
     public MarketplaceService(DrawingDbContext db)
     {
         _db = db;
@@ -112,11 +110,13 @@ public sealed class MarketplaceService : IMarketplaceService
             carousels.Add(new HomeCategoryDto(categoryDto, artworks.Select(Card).ToList()));
         }
 
+
         var featured = await PublicArtworks()
-            .Where(x => x.SaleStatus == ArtworkSaleStatus.Available)
+            .Where(x => x.SaleStatus == ArtworkSaleStatus.Available && x.IsFeatured)
             .OrderByDescending(x => x.PublishedAt)
             .Take(12)
             .ToListAsync(ct);
+
 
         return new HomeDto(slides, carousels, featured.Select(Card).ToList());
     }
@@ -556,15 +556,16 @@ public sealed class MarketplaceService : IMarketplaceService
                     order.MarkAsPaid();
                     artwork.MarkAsSold();
 
-                    _db.Payments.Add(new Payment
+                    var payment = new Payment
                     {
                         OrderId = order.Id,
                         Amount = order.TotalAmount,
-                        Currency = "AZN",
-                        PaymentMethod = "Manual",
-                        Status = PaymentStatus.Confirmed,
-                        PaidAt = DateTime.UtcNow
-                    });
+                        Currency = "AZN"
+                    };
+
+                    payment.Confirm("Manual");
+
+                    _db.Payments.Add(payment);
 
                     break;
                 }

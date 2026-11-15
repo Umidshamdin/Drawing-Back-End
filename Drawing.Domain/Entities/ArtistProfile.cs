@@ -14,6 +14,7 @@ public class ArtistProfile : BaseEntity
     public string? RejectionReason { get; private set; }
     public DateTime? ReviewedAt { get; private set; }
     public Guid? ReviewedByUserId { get; private set; }
+    public bool IsFeatured { get; set; }
     public ICollection<Artwork> Artworks { get; set; }  = new List<Artwork>();
     public void Approve(Guid adminUserId)
     {
@@ -25,6 +26,16 @@ public class ArtistProfile : BaseEntity
         ReviewedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
+    public void Resubmit()
+    {
+        if (Status != ArtistStatus.Rejected) throw new DomainException("Yalnız rədd edilmiş müraciət yenidən göndərilə bilər.");
+
+        Status = ArtistStatus.Pending;
+        RejectionReason = null;
+        ReviewedAt = null;
+        ReviewedByUserId = null;
+    }
+
     public void Reject(Guid adminUserId, string reason)
     {
         if (Status != ArtistStatus.Pending) throw new DomainException("Only pending artist profiles can be rejected.");

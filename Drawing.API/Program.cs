@@ -6,6 +6,7 @@ using Drawing.Infrastructure.Identity;
 using Drawing.Infrastructure.Services;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,18 @@ builder.Services.AddRateLimiter(options =>
         limiter.PermitLimit = 10;
         limiter.Window = TimeSpan.FromMinutes(1);
     });
+
+
+    options.AddPolicy("auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 6,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });

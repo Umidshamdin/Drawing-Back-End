@@ -19,6 +19,7 @@ public class Artwork : BaseEntity
     public bool IsFramed { get; set; }
     public string City { get; set; } = "Bakı";
     public string? LocationDetails { get; set; }
+    public bool IsFeatured { get; set; }
     public ArtworkModerationStatus ModerationStatus
     {
         get;

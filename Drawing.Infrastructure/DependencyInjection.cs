@@ -44,7 +44,7 @@ public static class DependencyInjection
             options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             options.Lockout.MaxFailedAccessAttempts = 5;
             options.Lockout.AllowedForNewUsers = true;
-            options.SignIn.RequireConfirmedEmail = false;
+            options.SignIn.RequireConfirmedEmail = true;
         })
 
         .AddRoles<IdentityRole<Guid>>()
@@ -52,6 +52,9 @@ public static class DependencyInjection
         .AddDefaultTokenProviders();
 
         services.AddScoped<IAuthService, AuthService>();
+
+        services.AddScoped<IEmailDelivery, EmailDelivery>();
+
 
         var jwtKey = configuration["Jwt:Key"];
         var jwtIssuer = configuration["Jwt:Issuer"];
@@ -95,16 +98,14 @@ public static class DependencyInjection
                         RoleClaimType = "role"
                     };
 
+
                 options.Events = new JwtBearerEvents
                 {
                     OnTokenValidated = async context =>
                     {
-                        var userManager = context.HttpContext
-                            .RequestServices
-                            .GetRequiredService<UserManager<ApplicationUser>>();
-
-                        var userId = context.Principal?
-                            .FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                        var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+                        var userId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                        var tokenStamp = context.Principal?.FindFirst("stamp")?.Value;
 
                         if (!Guid.TryParse(userId, out var id))
                         {
@@ -114,12 +115,29 @@ public static class DependencyInjection
 
                         var user = await userManager.FindByIdAsync(id.ToString());
 
-                        if (user is null || user.IsBlocked)
+                        if (user is null || user.IsBlocked || !user.EmailConfirmed || await userManager.IsLockedOutAsync(user))
                         {
                             context.Fail("User is unavailable.");
+                            return;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(tokenStamp) || tokenStamp != user.SecurityStamp)
+                        {
+                            context.Fail("Session was revoked.");
+                            return;
+                        }
+
+                        foreach (var role in context.Principal!.FindAll("role"))
+                        {
+                            if (!await userManager.IsInRoleAsync(user, role.Value))
+                            {
+                                context.Fail("Role permission was revoked.");
+                                return;
+                            }
                         }
                     }
                 };
+
             });
 
         services.AddAuthorization(options =>

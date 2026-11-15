@@ -34,6 +34,7 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<SiteSetting> SiteSettings => Set<SiteSetting>();
     public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshSession> RefreshSessions => Set<RefreshSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +71,17 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
             .WithMany()
             .HasForeignKey(x => x.AdminUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+
+        modelBuilder.Entity<RefreshSession>(entity =>
+        {
+            entity.ToTable("RefreshSessions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.ExpiresAt });
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

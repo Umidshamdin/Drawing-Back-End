@@ -25,3 +25,5 @@ appsettings.*.local.json
 # Frontend (future)
 node_modules/
 dist/
+
+**/mailbox-dev/
