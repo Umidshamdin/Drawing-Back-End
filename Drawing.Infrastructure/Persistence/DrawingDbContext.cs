@@ -7,11 +7,11 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drawing.Infrastructure.Persistence;
+
 public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>, IUnitOfWork
 {
-    public DrawingDbContext(DbContextOptions<DrawingDbContext> options) : base(options)
-    {
-    }
+    public DrawingDbContext(DbContextOptions<DrawingDbContext> options) : base(options) { }
+
     public DbSet<ArtistProfile> ArtistProfiles => Set<ArtistProfile>();
     public DbSet<Artwork> Artworks => Set<Artwork>();
     public DbSet<ArtworkImage> ArtworkImages => Set<ArtworkImage>();
@@ -19,6 +19,8 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<ArtworkStyle> ArtworkStyles => Set<ArtworkStyle>();
+    public DbSet<Category> Categories => Set<Category>();
+    public DbSet<ArtworkCategory> ArtworkCategories => Set<ArtworkCategory>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
@@ -27,22 +29,22 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<OrderNote> OrderNotes => Set<OrderNote>();
+    public DbSet<HomeSlide> HomeSlides => Set<HomeSlide>();
+    public DbSet<SitePage> SitePages => Set<SitePage>();
+    public DbSet<SiteSetting> SiteSettings => Set<SiteSetting>();
+    public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DrawingDbContext).Assembly);
 
-        modelBuilder.Entity<ApplicationUser>(entity =>
+        modelBuilder.Entity<ApplicationUser>(builder =>
         {
-            entity.Property(x => x.FullName)
-                .HasMaxLength(200)
-                .IsRequired();
-
-            entity.Property(x => x.IsBlocked)
-                .HasDefaultValue(false);
-
-            entity.HasIndex(x => x.IsBlocked);
+            builder.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+            builder.Property(x => x.IsBlocked).HasDefaultValue(false);
+            builder.HasIndex(x => x.IsBlocked);
         });
 
         modelBuilder.Entity<ArtistProfile>()
@@ -69,12 +71,8 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
             .HasForeignKey(x => x.AdminUserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        UpdateAuditFields();
-        return await base.SaveChangesAsync(cancellationToken);
-    }
-    private void UpdateAuditFields()
     {
         var now = DateTime.UtcNow;
 
@@ -82,17 +80,16 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
         {
             if (entry.State == EntityState.Added)
             {
-                if (entry.Entity.Id == Guid.Empty)
-                    entry.Entity.Id = Guid.NewGuid();
-
+                if (entry.Entity.Id == Guid.Empty) entry.Entity.Id = Guid.NewGuid();
                 entry.Entity.CreatedAt = now;
             }
-
-            if (entry.State == EntityState.Modified)
+            else if (entry.State == EntityState.Modified)
             {
                 entry.Property(x => x.CreatedAt).IsModified = false;
                 entry.Entity.UpdatedAt = now;
             }
         }
+
+        return await base.SaveChangesAsync(cancellationToken);
     }
 }
