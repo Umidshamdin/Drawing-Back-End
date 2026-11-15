@@ -18,6 +18,8 @@ public sealed class CreateOrderRequest
     [Required, StringLength(1000)]
     public string Address { get; set; } = string.Empty;
 
+    public Guid RequestId { get; set; }
+
     [Required, StringLength(100)]
     public string City { get; set; } = "Bakı";
 }
@@ -31,6 +33,7 @@ public sealed class AdminOrderTransitionRequest
     [Required]
     public string Action { get; set; } = string.Empty;
 
+    [StringLength(1000)]
     public string? Reason { get; set; }
     public decimal? DeliveryFee { get; set; }
     public int ReservationHours { get; set; } = 24;

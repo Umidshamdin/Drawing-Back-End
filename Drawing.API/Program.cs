@@ -52,6 +52,8 @@ builder.Services.AddScoped<IReferenceDataService, ReferenceDataService>();
 builder.Services.AddScoped<IContentAdminService, ContentAdminService>();
 builder.Services.AddScoped<IOrderManagementService, OrderManagementService>();
 
+builder.Services.AddScoped<IEmailQueueAdminService, EmailQueueAdminService>();
+builder.Services.AddHostedService<OrphanMediaCleanupWorker>();
 builder.Services.AddScoped<SafeImageService>();
 
 builder.Services.AddHostedService<ReservationExpiryWorker>();
@@ -134,5 +136,7 @@ app.MapGet("/health/ready", async (DrawingDbContext db, CancellationToken ct) =>
 });
 
 await IdentityDataSeeder.SeedRolesAsync(app.Services);
+await ReferenceDataSeeder.SeedAsync(app.Services);
+
 
 app.Run();

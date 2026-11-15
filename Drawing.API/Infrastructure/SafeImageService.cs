@@ -7,7 +7,7 @@ public sealed class SafeImageService
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _environment;
     private const long MaxBytes = 10 * 1024 * 1024;
-
+    public string StorageRoot => RootPath;
     private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".jpg", ".jpeg", ".png", ".webp"

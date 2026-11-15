@@ -1,6 +1,7 @@
 ﻿using Drawing.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Drawing.API.Infrastructure;
 public sealed class ExceptionMiddleware
@@ -31,6 +32,9 @@ public sealed class ExceptionMiddleware
                 DomainException => 409,
                 ArgumentException => 400,
                 DbUpdateConcurrencyException => 409,
+
+                PostgresException pg when pg.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.UniqueViolation => 409,
+
                 DbUpdateException => 409,
                 InvalidOperationException => 409,
                 _ => 500

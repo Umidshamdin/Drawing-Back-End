@@ -13,6 +13,7 @@ public class Order : BaseEntity
     public string DeliveryCity { get; set; } = "Bakı";
     public decimal TotalAmount { get; set; }
     public decimal DeliveryFee { get; set; }
+    public Guid? RequestId { get; set; }
     public OrderStatus Status { get; private set; } = OrderStatus.Pending;
     public string? RejectionReason { get; private set; }
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();

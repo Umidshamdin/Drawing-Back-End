@@ -409,6 +409,19 @@ public sealed class MarketplaceService : IMarketplaceService
 
     public async Task<OrderDto> CreateOrderAsync(Guid userId, CreateOrderRequest request, CancellationToken ct)
     {
+
+
+        if (request.RequestId == Guid.Empty)
+            throw new ArgumentException("Sifariş sorğusunun RequestId dəyəri tələb olunur.");
+
+        var existingOrder = await _db.Orders
+            .AsNoTracking()
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.BuyerUserId == userId && x.RequestId == request.RequestId, ct);
+
+        if (existingOrder is not null)
+            return MapOrder(existingOrder);
+
         if (request.ArtworkId == Guid.Empty)
             throw new ArgumentException("Əsər seçilməyib.");
 
@@ -434,7 +447,8 @@ public sealed class MarketplaceService : IMarketplaceService
             BuyerPhone = request.Phone.Trim(),
             DeliveryAddress = request.Address.Trim(),
             DeliveryCity = "Bakı",
-            TotalAmount = artwork.Price
+            TotalAmount = artwork.Price,
+            RequestId = request.RequestId,
         };
 
         order.Items.Add(new OrderItem

@@ -95,6 +95,12 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
             entity.Property(x => x.LastError).HasMaxLength(500);
             entity.HasIndex(x => new { x.SentAt, x.Attempts, x.CreatedAt });
         });
+
+
+        modelBuilder.Entity<Order>()
+            .HasIndex(x => new { x.BuyerUserId, x.RequestId })
+            .IsUnique()
+            .HasFilter("\"RequestId\" IS NOT NULL");
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

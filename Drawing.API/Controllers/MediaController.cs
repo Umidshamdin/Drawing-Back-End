@@ -188,11 +188,21 @@ public sealed class MediaController : ControllerBase
         }
     }
 
+
     [Authorize]
     [HttpDelete("artist/artworks/{artworkId:guid}/images/{imageId:guid}")]
     public async Task<IActionResult> DeleteArtworkImage(Guid artworkId, Guid imageId, CancellationToken ct)
     {
+        var key = await _db.ArtworkImages.AsNoTracking()
+            .Where(x => x.Id == imageId && x.ArtworkId == artworkId)
+            .Select(x => x.StorageKey)
+            .FirstOrDefaultAsync(ct);
+
         await _marketplace.DeleteArtworkImageAsync(this.UserId(), artworkId, imageId, ct);
+
+        if (!string.IsNullOrWhiteSpace(key)) _storage.DeleteFiles(key);
+
         return NoContent();
     }
+
 }
