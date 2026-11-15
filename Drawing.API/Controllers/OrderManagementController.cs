@@ -24,6 +24,16 @@ public sealed class OrderManagementController : ControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 
+
+    [Authorize(Policy = "AdminOnly")]
+    [HttpGet("admin/orders/{id:guid}/details")]
+    public async Task<IActionResult> AdminDetails(Guid id, CancellationToken ct)
+    {
+        var order = await _service.GetAdminDetailsAsync(id, ct);
+        return order is null ? NotFound() : Ok(order);
+    }
+
+
     [HttpGet("artist/sales")]
     public Task<IReadOnlyList<ArtistSaleDto>> ArtistSales(CancellationToken ct)
     {

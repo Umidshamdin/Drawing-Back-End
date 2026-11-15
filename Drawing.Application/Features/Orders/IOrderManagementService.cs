@@ -7,4 +7,5 @@ public interface IOrderManagementService
     Task UpdateDeliveryAsync(Guid adminId, Guid orderId, DeliveryUpsertRequest request, CancellationToken ct);
     Task<Guid> AddNoteAsync(Guid adminId, Guid orderId, AddOrderNoteRequest request, CancellationToken ct);
     Task<IReadOnlyList<AdminOrderNoteDto>> GetNotesAsync(Guid orderId, CancellationToken ct);
+    Task<AdminOrderDetailsDto?> GetAdminDetailsAsync(Guid orderId, CancellationToken ct);
 }

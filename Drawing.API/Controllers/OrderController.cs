@@ -3,6 +3,7 @@ using Drawing.Application.Features.Marketplace;
 using Drawing.Application.Features.Orders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Drawing.API.Controllers;
 
@@ -19,6 +20,7 @@ public sealed class OrderController : ControllerBase
     }
 
     [HttpPost]
+    [EnableRateLimiting("public-write")]
     public async Task<IActionResult> Create([FromBody] CreateOrderRequest request, CancellationToken ct)
     {
         var order = await _service.CreateOrderAsync(this.UserId(), request, ct);

@@ -19,7 +19,9 @@ public sealed class ArtistCatalogService : IArtistCatalogService
     private static ArtworkCardDto MapArtwork(Drawing.Domain.Entities.Artwork artwork)
     {
         var image = artwork.Images.OrderByDescending(x => x.IsPrimary).ThenBy(x => x.SortOrder).FirstOrDefault();
-        var imageUrl = image is null ? null : "/api/v1/media/" + image.StorageKey;
+
+        var imageUrl = image is null ? null : "/api/v1/media/thumbnails/" + Path.GetFileNameWithoutExtension(image.StorageKey) + ".webp";
+
 
         return new ArtworkCardDto(artwork.Id, artwork.Title, artwork.Price, artwork.City, artwork.ArtistProfile.DisplayName, artwork.SaleStatus.ToString(), imageUrl, artwork.PublishedAt);
     }

@@ -2,6 +2,7 @@
 using Drawing.Domain.Common;
 using Drawing.Domain.Entities;
 using Drawing.Infrastructure.Identity;
+using Drawing.Infrastructure.Notifications;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,7 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshSession> RefreshSessions => Set<RefreshSession>();
+    public DbSet<OutboxEmail> OutboxEmails => Set<OutboxEmail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +84,17 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
             entity.HasIndex(x => new { x.UserId, x.ExpiresAt });
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<OutboxEmail>(entity =>
+        {
+            entity.ToTable("OutboxEmails");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ToEmail).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Subject).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.LastError).HasMaxLength(500);
+            entity.HasIndex(x => new { x.SentAt, x.Attempts, x.CreatedAt });
+        });
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -104,4 +117,6 @@ public sealed class DrawingDbContext : IdentityDbContext<ApplicationUser, Identi
 
         return await base.SaveChangesAsync(cancellationToken);
     }
+
+
 }

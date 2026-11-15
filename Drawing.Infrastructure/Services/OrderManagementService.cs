@@ -55,6 +55,39 @@ public sealed class OrderManagementService : IOrderManagementService
         return items.Select(x => new ArtistSaleDto(x.OrderId, x.ArtworkId, x.ArtworkTitle, x.UnitPrice, x.Order.Status.ToString(), x.Order.CreatedAt)).ToList();
     }
 
+
+    public async Task<AdminOrderDetailsDto?> GetAdminDetailsAsync(Guid orderId, CancellationToken ct)
+    {
+        var order = await _db.Orders.AsNoTracking()
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == orderId, ct);
+
+        if (order is null) return null;
+
+        var delivery = await _db.Deliveries.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == orderId, ct);
+
+        var deliveryDto = delivery is null
+            ? null
+            : new DeliveryDto(delivery.CourierName, delivery.TrackingNumber, delivery.DeliveryNotes, delivery.EstimatedDeliveryAt, delivery.DeliveredAt);
+
+        var items = order.Items.Select(x => new OrderItemDto(x.ArtworkId, x.ArtworkTitle, x.UnitPrice)).ToList();
+
+        return new AdminOrderDetailsDto(
+            order.Id,
+            order.BuyerUserId,
+            order.BuyerFullName,
+            order.BuyerEmail,
+            order.BuyerPhone,
+            order.DeliveryAddress,
+            order.DeliveryCity,
+            order.TotalAmount,
+            order.DeliveryFee,
+            order.Status.ToString(),
+            order.CreatedAt,
+            items,
+            deliveryDto);
+    }
+
     public async Task UpdateDeliveryAsync(Guid adminId, Guid orderId, DeliveryUpsertRequest request, CancellationToken ct)
     {
         var order = await _db.Orders.FirstOrDefaultAsync(x => x.Id == orderId, ct)

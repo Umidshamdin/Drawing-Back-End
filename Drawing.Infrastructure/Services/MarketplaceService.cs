@@ -3,6 +3,7 @@ using Drawing.Application.Features.Marketplace;
 using Drawing.Application.Features.Orders;
 using Drawing.Domain.Entities;
 using Drawing.Domain.Enums;
+using Drawing.Infrastructure.Notifications;
 using Drawing.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,12 +24,19 @@ public sealed class MarketplaceService : IMarketplaceService
         return "/api/v1/media/" + key;
     }
 
+    private static string CardImageUrl(string key)
+    {
+        if (!key.StartsWith("artworks/", StringComparison.Ordinal)) return Url(key);
+
+        return "/api/v1/media/thumbnails/" + Path.GetFileNameWithoutExtension(key) + ".webp";
+    }
+
     private static ArtworkCardDto Card(Artwork artwork)
     {
         var image = artwork.Images
             .OrderByDescending(x => x.IsPrimary)
             .ThenBy(x => x.SortOrder)
-            .Select(x => Url(x.StorageKey))
+            .Select(x => CardImageUrl(x.StorageKey))
             .FirstOrDefault();
 
         return new ArtworkCardDto(
@@ -310,6 +318,17 @@ public sealed class MarketplaceService : IMarketplaceService
     {
         HomeSlide slide;
 
+        if (!string.IsNullOrWhiteSpace(request.LinkUrl))
+        {
+            var link = request.LinkUrl.Trim();
+
+            if (!link.StartsWith('/') || link.StartsWith("//"))
+                throw new ArgumentException("Slider keçidi sayt daxilində nisbi URL olmalıdır.");
+        }
+
+        if (!request.ImageKey.StartsWith("slides/", StringComparison.Ordinal))
+            throw new ArgumentException("Slider üçün düzgün şəkil seçilməyib.");
+
         if (id.HasValue)
         {
             slide = await _db.HomeSlides.FindAsync(new object[] { id.Value }, ct)
@@ -427,6 +446,15 @@ public sealed class MarketplaceService : IMarketplaceService
         });
 
         _db.Orders.Add(order);
+
+
+        _db.OutboxEmails.Add(new OutboxEmail
+        {
+            ToEmail = order.BuyerEmail,
+            Subject = "Sifariş sorğunuz qəbul edildi",
+            Body = $"Sifariş nömrəsi: {order.Id}\nƏsər: {artwork.Title}\nMəbləğ: {order.TotalAmount} AZN\nSifarişiniz administrator tərəfindən yoxlanılacaq."
+        });
+
 
         _db.OrderStatusHistories.Add(new OrderStatusHistory
         {
@@ -655,6 +683,30 @@ public sealed class MarketplaceService : IMarketplaceService
             default:
                 throw new ArgumentException("Yanlış sifariş əməliyyatı.");
         }
+
+
+        string? notification = action switch
+        {
+            "confirm" => $"Sifarişiniz təsdiqləndi.\nSifariş: {order.Id}\nRezervasiya müddəti: {Math.Clamp(request.ReservationHours, 1, 168)} saat.",
+            "requestpayment" => $"Sifariş: {order.Id}\nYekun məbləğ: {order.TotalAmount} AZN\nÖdəniş qaydası: {request.PaymentInstructions}",
+            "paid" => $"Sifariş: {order.Id}\nÖdəniş təsdiqləndi.",
+            "shipped" => $"Sifariş: {order.Id}\nƏsər çatdırılmaya göndərildi.",
+            "complete" => $"Sifariş: {order.Id}\nÇatdırılma tamamlandı.",
+            "cancel" => $"Sifariş: {order.Id}\nSifariş ləğv edildi.",
+            "reject" => $"Sifariş: {order.Id}\nSifariş rədd edildi.\nSəbəb: {request.Reason}",
+            _ => null
+        };
+
+        if (notification is not null)
+        {
+            _db.OutboxEmails.Add(new OutboxEmail
+            {
+                ToEmail = order.BuyerEmail,
+                Subject = "Sifariş statusu yeniləndi",
+                Body = notification
+            });
+        }
+
 
         _db.OrderStatusHistories.Add(new OrderStatusHistory
         {

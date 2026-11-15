@@ -47,6 +47,40 @@ public sealed class MediaController : ControllerBase
         return PhysicalFile(path, GetMimeType(path), enableRangeProcessing: true);
     }
 
+
+    [HttpGet("thumbnails/{filename}")]
+    public async Task<IActionResult> GetThumbnail(string filename, CancellationToken ct)
+    {
+        if (filename != Path.GetFileName(filename) || Path.GetExtension(filename).ToLowerInvariant() != ".webp")
+            return BadRequest();
+
+        var name = Path.GetFileNameWithoutExtension(filename);
+
+        if (!Guid.TryParseExact(name, "N", out _)) return BadRequest();
+
+        var possibleKeys = new[]
+        {
+        $"artworks/{name}.jpg",
+        $"artworks/{name}.jpeg",
+        $"artworks/{name}.png",
+        $"artworks/{name}.webp"
+    };
+
+        var userId = CurrentUserId();
+        var admin = User.IsInRole("Admin");
+
+        var visible = await _db.ArtworkImages.AsNoTracking()
+            .AnyAsync(x => possibleKeys.Contains(x.StorageKey) &&
+                (
+                    (x.Artwork.ModerationStatus == ArtworkModerationStatus.Approved && x.Artwork.ArtistProfile.Status == ArtistStatus.Approved) ||
+                    x.Artwork.ArtistProfile.UserId == userId ||
+                    admin
+                ), ct);
+
+        return visible ? Serve("thumbnails/" + filename) : NotFound();
+    }
+
+
     private Guid? CurrentUserId()
     {
         var value = User.FindFirst("sub")?.Value;
@@ -128,7 +162,7 @@ public sealed class MediaController : ControllerBase
         }
         catch
         {
-            System.IO.File.Delete(_storage.ResolvePath(key));
+            _storage.DeleteFiles(key);
             throw;
         }
     }
@@ -149,7 +183,7 @@ public sealed class MediaController : ControllerBase
         }
         catch
         {
-            System.IO.File.Delete(_storage.ResolvePath(key));
+            _storage.DeleteFiles(key);
             throw;
         }
     }

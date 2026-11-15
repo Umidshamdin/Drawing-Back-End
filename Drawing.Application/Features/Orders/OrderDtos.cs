@@ -34,4 +34,7 @@ public sealed class AdminOrderTransitionRequest
     public string? Reason { get; set; }
     public decimal? DeliveryFee { get; set; }
     public int ReservationHours { get; set; } = 24;
+
+    [StringLength(1000)]
+    public string? PaymentInstructions { get; set; }
 }
